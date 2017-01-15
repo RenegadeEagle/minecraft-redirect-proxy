@@ -1,61 +1,80 @@
 package co.renegadeeagle.mcproxy.codec;
 
+import co.renegadeeagle.mcproxy.Main;
 import co.renegadeeagle.mcproxy.SocketState;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.AttributeKey;
 
-
 public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
-    final static AttributeKey<SocketState> socketState = AttributeKey.valueOf("socketstate");
+    final static AttributeKey<SocketState> GLOBAL = AttributeKey.valueOf("socketstate");
+    final static AttributeKey<Channel> PROXY_CHANNEL = AttributeKey.valueOf("proxychannel");
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        ByteBuf buf = (ByteBuf) msg;
-        SocketState soketState = ctx.channel().attr(socketState).get();
+    public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
+        final ByteBuf buf = (ByteBuf) msg;
+        SocketState socketState = ctx.channel().attr(GLOBAL).get();
         if (socketState == null) {
             //init socket.
-            ctx.channel().attr(socketState).set(SocketState.HANDSHAKE);
+            ctx.channel().attr(GLOBAL).set(SocketState.HANDSHAKE);
             final int packetLength = readVarInt(buf);
             final int packetID = readVarInt(buf);
-            System.out.printf("Received packet with length %d and id %d", packetLength, packetID);
             if (packetID == 0) {
                 final int clientVersion = readVarInt(buf);
                 final String hostname = readString(buf);
                 final int port = buf.readUnsignedShort();
                 final int state = readVarInt(buf);
-                System.out.printf("received handshake packet with client version %d, hostname %s, port %d, and state %d", clientVersion, hostname, port, state);
 
-                EventLoopGroup workerGroup = new NioEventLoopGroup();
-                Bootstrap b = new Bootstrap(); // (1)
-                b.group(workerGroup); // (2)
-                b.channel(NioSocketChannel.class); // (3)
-                b.option(ChannelOption.SO_KEEPALIVE, true); // (4)
+                Bootstrap b = new Bootstrap();
+                b.group(Main.getWorkerGroup());
+                b.channel(NioSocketChannel.class);
+                b.option(ChannelOption.SO_KEEPALIVE, true);
                 b.handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(this);
-                        ch.pipeline().addLast("encoder", new MinecraftEncoder());
-                        ByteBuf sendBuf = Unpooled.buffer();
-                        writeVarInt(packetLength, sendBuf);
-                        writeVarInt(packetID, sendBuf);
-                        writeVarInt(clientVersion, sendBuf);
-                        writeString(hostname, sendBuf);
-                        writeVarInt(port, sendBuf);
-                        writeVarInt(state, sendBuf);
-                        ch.write(sendBuf);
+                        ch.pipeline().addLast(new ProxyHandler(ctx.channel()));
                     }
                 });
-                ChannelFuture f = b.connect(hostname, port).sync(); // (5)
-                f.channel().closeFuture().sync();
+
+                final ChannelFuture cf = b.connect("mc.hypixel.net", 25565);
+                cf.await();
+
+                cf.addListener(new ChannelFutureListener() {
+                    @Override
+                    public void operationComplete(ChannelFuture future) throws Exception {
+                        if(future.isSuccess()) {
+                            ByteBuf sendBuf = Unpooled.buffer();
+                            writeVarInt(packetLength, sendBuf);
+                            writeVarInt(packetID, sendBuf);
+                            writeVarInt(clientVersion, sendBuf);
+                            writeString(hostname, sendBuf);
+                            writeVarShort(sendBuf, port);
+                            writeVarInt(state, sendBuf);
+
+                            while(buf.readableBytes() > 0) {
+                                byte b = buf.readByte();
+                                sendBuf.writeByte(b);
+                            }
+
+                            future.channel().writeAndFlush(sendBuf); //Send out the handshake + anything else we've gotten (Request or login start packet)
+                            ctx.channel().attr(GLOBAL).set(SocketState.PROXY);
+                            ctx.channel().attr(PROXY_CHANNEL).set(cf.channel());
+                        } else {
+                            ctx.close();
+                            cf.channel().close();
+                        }
+                    }
+                });
             }
         } else {
-            System.out.println("Whatever.");
+            Channel proxiedChannel = ctx.channel().attr(PROXY_CHANNEL).get();
+            byte[] bytes = new byte[buf.readableBytes()];
+            buf.readBytes(bytes);
+            proxiedChannel.writeAndFlush(Unpooled.buffer().writeBytes(bytes));
         }
     }
 
@@ -120,5 +139,31 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
         byte[] b = s.getBytes();
         writeVarInt(b.length, buf);
         buf.writeBytes(b);
+    }
+    public static int readVarShort(ByteBuf buf)
+    {
+        int low = buf.readUnsignedShort();
+        int high = 0;
+        if ( ( low & 0x8000 ) != 0 )
+        {
+            low = low & 0x7FFF;
+            high = buf.readUnsignedByte();
+        }
+        return ( ( high & 0xFF ) << 15 ) | low;
+    }
+
+    public static void writeVarShort(ByteBuf buf, int toWrite)
+    {
+        int low = toWrite & 0x7FFF;
+        int high = ( toWrite & 0x7F8000 ) >> 15;
+        if ( high != 0 )
+        {
+            low = low | 0x8000;
+        }
+        buf.writeShort( low );
+        if ( high != 0 )
+        {
+            buf.writeByte( high );
+        }
     }
 }
