@@ -1,0 +1,19 @@
+{
+  "versionName": "ProxyCup",
+  "maxPlayers": 1337,
+  "onlinePlayers": 133,
+  "motd": "Couldn\u0027t connect to requested backend server. If you believe this to be an issue, contact the administrator of this proxy.",
+  "port": 22000,
+  "nodes": [
+    {
+      "hostname": "localhost",
+      "remoteHostname": "mc.hypixel.net",
+      "remoteHostPort": 25565
+    },
+    {
+      "hostname": "127.0.0.1",
+      "remoteHostname": "mc.arkhamnetwork.org",
+      "remoteHostPort": 25565
+    }
+  ]
+}

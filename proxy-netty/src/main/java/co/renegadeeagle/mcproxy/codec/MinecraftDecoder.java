@@ -1,6 +1,7 @@
 package co.renegadeeagle.mcproxy.codec;
 
 import co.renegadeeagle.mcproxy.Main;
+import co.renegadeeagle.mcproxy.Node;
 import co.renegadeeagle.mcproxy.SocketState;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
@@ -19,7 +20,6 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
         final ByteBuf buf = (ByteBuf) msg;
         SocketState socketState = ctx.channel().attr(GLOBAL).get();
         if (socketState == null) {
-            //init socket.
             ctx.channel().attr(GLOBAL).set(SocketState.HANDSHAKE);
             final int packetLength = readVarInt(buf);
             final int packetID = readVarInt(buf);
@@ -39,14 +39,14 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                         ch.pipeline().addLast(new ProxyHandler(ctx.channel()));
                     }
                 });
-
-                final ChannelFuture cf = b.connect("mc.hypixel.net", 25565);
+                Node node = nodeFromHostname(hostname);
+                final ChannelFuture cf = b.connect(node.getRemoteHostname(), node.getRemoteHostPort());
                 cf.await();
 
                 cf.addListener(new ChannelFutureListener() {
                     @Override
                     public void operationComplete(ChannelFuture future) throws Exception {
-                        if(future.isSuccess()) {
+                        if (future.isSuccess()) {
                             ByteBuf sendBuf = Unpooled.buffer();
                             writeVarInt(packetLength, sendBuf);
                             writeVarInt(packetID, sendBuf);
@@ -55,7 +55,7 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                             writeVarShort(sendBuf, port);
                             writeVarInt(state, sendBuf);
 
-                            while(buf.readableBytes() > 0) {
+                            while (buf.readableBytes() > 0) {
                                 byte b = buf.readByte();
                                 sendBuf.writeByte(b);
                             }
@@ -78,6 +78,20 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
         }
     }
 
+    public Node nodeFromHostname(String req) {
+        for(Node node : Main.getSettings().getNodes()) {
+            if(node.getHostname().equalsIgnoreCase(req)) {
+                return node;
+            }
+        }
+        return null;
+    }
+
+
+    /*
+        All of these varint implementations comes from SpigotMC's bungeecord.
+        Source: https://github.com/SpigotMC/BungeeCord/blob/master/protocol/src/main/java/net/md_5/bungee/protocol/DefinedPacket.java
+     */
     public static int readVarInt(ByteBuf input) {
         return readVarInt(input, 5);
     }
@@ -140,30 +154,26 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
         writeVarInt(b.length, buf);
         buf.writeBytes(b);
     }
-    public static int readVarShort(ByteBuf buf)
-    {
+
+    public static int readVarShort(ByteBuf buf) {
         int low = buf.readUnsignedShort();
         int high = 0;
-        if ( ( low & 0x8000 ) != 0 )
-        {
+        if ((low & 0x8000) != 0) {
             low = low & 0x7FFF;
             high = buf.readUnsignedByte();
         }
-        return ( ( high & 0xFF ) << 15 ) | low;
+        return ((high & 0xFF) << 15) | low;
     }
 
-    public static void writeVarShort(ByteBuf buf, int toWrite)
-    {
+    public static void writeVarShort(ByteBuf buf, int toWrite) {
         int low = toWrite & 0x7FFF;
-        int high = ( toWrite & 0x7F8000 ) >> 15;
-        if ( high != 0 )
-        {
+        int high = (toWrite & 0x7F8000) >> 15;
+        if (high != 0) {
             low = low | 0x8000;
         }
-        buf.writeShort( low );
-        if ( high != 0 )
-        {
-            buf.writeByte( high );
+        buf.writeShort(low);
+        if (high != 0) {
+            buf.writeByte(high);
         }
     }
 }
