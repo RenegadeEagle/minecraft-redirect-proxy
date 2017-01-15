@@ -3,12 +3,14 @@ package co.renegadeeagle.mcproxy.codec;
 import co.renegadeeagle.mcproxy.Main;
 import co.renegadeeagle.mcproxy.Node;
 import co.renegadeeagle.mcproxy.SocketState;
+import co.renegadeeagle.mcproxy.util.PacketUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AttributeKey;
 
 public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
@@ -36,11 +38,12 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                 b.handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     public void initChannel(SocketChannel ch) throws Exception {
+                        ch.pipeline().addLast("readTimeoutHandler", new ReadTimeoutHandler(3));
                         ch.pipeline().addLast(new ProxyHandler(ctx.channel()));
                     }
                 });
                 Node node = nodeFromHostname(hostname);
-                final ChannelFuture cf = b.connect(node.getRemoteHostname(), node.getRemoteHostPort());
+                final ChannelFuture cf = b.connect("localhost", node.getRemoteHostPort());
                 cf.await();
 
                 cf.addListener(new ChannelFutureListener() {
@@ -64,6 +67,12 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                             ctx.channel().attr(GLOBAL).set(SocketState.PROXY);
                             ctx.channel().attr(PROXY_CHANNEL).set(cf.channel());
                         } else {
+                            ByteBuf body = PacketUtil.createStatusPacket(47);
+
+                            ByteBuf header = Unpooled.buffer();
+                            writeVarInt(body.readableBytes(), header);
+                            ctx.channel().writeAndFlush(header);
+                            ctx.channel().writeAndFlush(body);
                             ctx.close();
                             cf.channel().close();
                         }

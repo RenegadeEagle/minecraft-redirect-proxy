@@ -1,6 +1,7 @@
 package co.renegadeeagle.mcproxy;
 
 import co.renegadeeagle.mcproxy.codec.MinecraftDecoder;
+import co.renegadeeagle.mcproxy.util.PacketUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.netty.bootstrap.ServerBootstrap;

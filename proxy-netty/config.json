@@ -2,7 +2,7 @@
   "versionName": "ProxyCup",
   "maxPlayers": 1337,
   "onlinePlayers": 133,
-  "motd": "Couldn\u0027t connect to requested backend server. If you believe this to be an issue, contact the administrator of this proxy.",
+  "motd": "Could not connect to backend server.",
   "port": 22000,
   "nodes": [
     {
