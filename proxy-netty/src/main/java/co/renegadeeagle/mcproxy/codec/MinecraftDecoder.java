@@ -35,16 +35,15 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                 b.group(Main.getWorkerGroup());
                 b.channel(NioSocketChannel.class);
                 b.option(ChannelOption.SO_KEEPALIVE, true);
-                b.handler(new ChannelInitializer<SocketChannel>() {
+                b.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 1000);
+                b.handler(new ChannelInitializer<Channel>() {
                     @Override
-                    public void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast("readTimeoutHandler", new ReadTimeoutHandler(3));
+                    public void initChannel(Channel ch) throws Exception {
                         ch.pipeline().addLast(new ProxyHandler(ctx.channel()));
                     }
                 });
                 Node node = nodeFromHostname(hostname);
-                final ChannelFuture cf = b.connect("localhost", node.getRemoteHostPort());
-                cf.await();
+                final ChannelFuture cf = b.connect(node.getRemoteHostname(), node.getRemoteHostPort());
 
                 cf.addListener(new ChannelFutureListener() {
                     @Override
@@ -67,7 +66,7 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                             ctx.channel().attr(GLOBAL).set(SocketState.PROXY);
                             ctx.channel().attr(PROXY_CHANNEL).set(cf.channel());
                         } else {
-                            ByteBuf body = PacketUtil.createStatusPacket(47);
+                            ByteBuf body = PacketUtil.createStatusPacket(clientVersion);
 
                             ByteBuf header = Unpooled.buffer();
                             writeVarInt(body.readableBytes(), header);

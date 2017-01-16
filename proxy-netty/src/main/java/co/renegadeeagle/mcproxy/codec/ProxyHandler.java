@@ -25,12 +25,4 @@ public class ProxyHandler  extends ChannelDuplexHandler {
 
         originalChannel.writeAndFlush(Unpooled.buffer().writeBytes(bytes));
     }
-
-    @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        if(cause instanceof ReadTimeoutException) {
-            originalChannel.writeAndFlush(PacketUtil.createStatusPacket(47));
-            System.out.println("read time out. sending data.");
-        }
-    }
 }

@@ -53,7 +53,6 @@ public class Main {
             Gson gson = new Gson();
             try {
                 settings = gson.fromJson(new FileReader(file), Settings.class);
-                System.out.println(settings.getPort());
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
@@ -69,7 +68,7 @@ public class Main {
             defaultSettings.setVersionName("ProxyCup");
             defaultSettings.setMaxPlayers(1337);
             defaultSettings.setOnlinePlayers(133);
-            defaultSettings.setMotd("Couldn't connect to requested backend server. If you believe this to be an issue, contact the administrator of this proxy.");
+            defaultSettings.setMotd("Couldnt connect to requested backend server. If you believe this to be an issue, contact the administrator of this proxy.");
 
             defaultSettings.setPort((short) 22000);
 
