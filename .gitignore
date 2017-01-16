@@ -1,5 +1,5 @@
 *.json
-.idea/
+*/.idea/
 */target/
 */*/target/
 *.iml
