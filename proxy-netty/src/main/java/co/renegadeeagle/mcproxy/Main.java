@@ -1,7 +1,6 @@
 package co.renegadeeagle.mcproxy;
 
 import co.renegadeeagle.mcproxy.codec.MinecraftDecoder;
-import co.renegadeeagle.mcproxy.util.PacketUtil;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import io.netty.bootstrap.ServerBootstrap;
@@ -17,18 +16,18 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
-
 public class Main {
     private static EventLoopGroup bossGroup = new NioEventLoopGroup();
     private static EventLoopGroup workerGroup = new NioEventLoopGroup();
     private static Settings settings = null;
+
     public static void main(String args[]) {
         loadSettings();
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    .childHandler(new ChannelInitializer<SocketChannel>() { // (4)
+                    .childHandler(new ChannelInitializer<SocketChannel>() {
                         @Override
                         public void initChannel(SocketChannel ch) throws Exception {
                             ch.pipeline().addLast(new MinecraftDecoder());
@@ -37,7 +36,7 @@ public class Main {
                     .option(ChannelOption.SO_BACKLOG, 128)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
 
-            ChannelFuture f = b.bind(22000).sync(); // (7)
+            ChannelFuture f = b.bind(settings.getPort()).sync();
 
             f.channel().closeFuture().sync();
         } catch (InterruptedException e) {
@@ -47,9 +46,10 @@ public class Main {
             bossGroup.shutdownGracefully();
         }
     }
-    public static void loadSettings()  {
+
+    public static void loadSettings() {
         File file = new File(System.getProperty("user.dir") + "/config.json");
-        if(file.exists()) {
+        if (file.exists()) {
             Gson gson = new Gson();
             try {
                 settings = gson.fromJson(new FileReader(file), Settings.class);
@@ -61,6 +61,8 @@ public class Main {
             try {
                 file.createNewFile();
             } catch (IOException e) {
+                System.out.println("Could not create default configuration file.");
+                System.exit(0);
                 e.printStackTrace();
             }
             Gson gson = new GsonBuilder().setPrettyPrinting().create();

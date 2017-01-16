@@ -8,21 +8,19 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
-import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.AttributeKey;
 
 public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
-    final static AttributeKey<SocketState> GLOBAL = AttributeKey.valueOf("socketstate");
+    final static AttributeKey<SocketState> SOCKET_STATE = AttributeKey.valueOf("socketstate");
     final static AttributeKey<Channel> PROXY_CHANNEL = AttributeKey.valueOf("proxychannel");
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
         final ByteBuf buf = (ByteBuf) msg;
-        SocketState socketState = ctx.channel().attr(GLOBAL).get();
+        SocketState socketState = ctx.channel().attr(SOCKET_STATE).get();
         if (socketState == null) {
-            ctx.channel().attr(GLOBAL).set(SocketState.HANDSHAKE);
+            ctx.channel().attr(SOCKET_STATE).set(SocketState.HANDSHAKE);
             final int packetLength = readVarInt(buf);
             final int packetID = readVarInt(buf);
             if (packetID == 0) {
@@ -63,15 +61,17 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
                             }
 
                             future.channel().writeAndFlush(sendBuf); //Send out the handshake + anything else we've gotten (Request or login start packet)
-                            ctx.channel().attr(GLOBAL).set(SocketState.PROXY);
+                            ctx.channel().attr(SOCKET_STATE).set(SocketState.PROXY);
                             ctx.channel().attr(PROXY_CHANNEL).set(cf.channel());
                         } else {
                             ByteBuf body = PacketUtil.createStatusPacket(clientVersion);
-
                             ByteBuf header = Unpooled.buffer();
+
                             writeVarInt(body.readableBytes(), header);
+
                             ctx.channel().writeAndFlush(header);
                             ctx.channel().writeAndFlush(body);
+
                             ctx.close();
                             cf.channel().close();
                         }
@@ -87,14 +87,13 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
     }
 
     public Node nodeFromHostname(String req) {
-        for(Node node : Main.getSettings().getNodes()) {
-            if(node.getHostname().equalsIgnoreCase(req)) {
+        for (Node node : Main.getSettings().getNodes()) {
+            if (node.getHostname().equalsIgnoreCase(req)) {
                 return node;
             }
         }
         return null;
     }
-
 
     /*
         All of these varint implementations comes from SpigotMC's bungeecord.
@@ -161,16 +160,6 @@ public class MinecraftDecoder extends ChannelInboundHandlerAdapter {
         byte[] b = s.getBytes();
         writeVarInt(b.length, buf);
         buf.writeBytes(b);
-    }
-
-    public static int readVarShort(ByteBuf buf) {
-        int low = buf.readUnsignedShort();
-        int high = 0;
-        if ((low & 0x8000) != 0) {
-            low = low & 0x7FFF;
-            high = buf.readUnsignedByte();
-        }
-        return ((high & 0xFF) << 15) | low;
     }
 
     public static void writeVarShort(ByteBuf buf, int toWrite) {

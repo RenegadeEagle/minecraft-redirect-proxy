@@ -16,7 +16,7 @@ import java.io.StringWriter;
 
 public class PacketUtil {
     /**
-     * @param protocolVersion input protocol verison of connecting client, because we always want to show we are the right version.
+     * @param protocolVersion protocol verison of connecting client, because we always want to show we are the right version.
      * @return
      */
     public static ByteBuf createStatusPacket(int protocolVersion) {
@@ -44,21 +44,10 @@ public class PacketUtil {
             e.printStackTrace();
         }
 
-        //There is probably a better way to do this without creating two bytebufs to append the header. TODO.
-        ByteBuf tempBuffer = Unpooled.buffer();
-        MinecraftDecoder.writeVarInt(0, tempBuffer);
+        ByteBuf buf = Unpooled.buffer();
+        MinecraftDecoder.writeVarInt(0, buf);
 
-        MinecraftDecoder.writeString(sw.toString(), tempBuffer);
-        return tempBuffer;
-    }
-    public static String toPrettyFormat(String jsonString)
-    {
-        JsonParser parser = new JsonParser();
-        JsonObject json = parser.parse(jsonString).getAsJsonObject();
-
-        Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String prettyJson = gson.toJson(json);
-
-        return prettyJson;
+        MinecraftDecoder.writeString(sw.toString(), buf);
+        return buf;
     }
 }
