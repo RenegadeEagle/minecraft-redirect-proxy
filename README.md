@@ -1,7 +1,7 @@
 # Minecraft Redirect Proxy
 This is a project that allows users to setup a proxy where any minecraft client can connect to any remote host. This project is written in two parts. One using default java sockets, and the other using a netty implementation. Do not use the sockets implementation, it is unfinished, and is horribly inefficent.
 
-
+This project would be useful for individuals who want to hide their IP address using a remote server, or possibly allowing an extra layer of filtering for server administrators. 
 ## Usage
 To compile and use the netty version, build with dependencies using maven
 ```
